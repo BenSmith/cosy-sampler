@@ -1,0 +1,159 @@
+# Cosy SELinux Policy Build Automation
+#
+# This justfile provides recipes for building and installing SELinux policy modules
+# for cosy containers. Use `just --list` to see all available commands.
+
+# Default recipe - show available commands
+default:
+    @just --list
+
+# Build cosy_default_t policy module
+build-default:
+    @echo "Building cosy_default_t policy module..."
+    @if [ ! -f /usr/share/selinux/devel/Makefile ]; then \
+        echo "Error: selinux-policy-devel package not installed"; \
+        echo "Please install it with: sudo dnf install selinux-policy-devel"; \
+        exit 1; \
+    fi
+    make -f /usr/share/selinux/devel/Makefile cosy_default_t.pp
+    @echo "✓ Built cosy_default_t.pp"
+
+# Build cosy_strict_t policy module
+build-strict:
+    @echo "Building cosy_strict_t policy module..."
+    @if [ ! -f /usr/share/selinux/devel/Makefile ]; then \
+        echo "Error: selinux-policy-devel package not installed"; \
+        echo "Please install it with: sudo dnf install selinux-policy-devel"; \
+        exit 1; \
+    fi
+    make -f /usr/share/selinux/devel/Makefile cosy_strict_t.pp
+    @echo "✓ Built cosy_strict_t.pp"
+
+# Build cosy_default_systemd_t policy module
+build-default-systemd:
+    @echo "Building cosy_default_systemd_t policy module..."
+    @if [ ! -f /usr/share/selinux/devel/Makefile ]; then \
+        echo "Error: selinux-policy-devel package not installed"; \
+        echo "Please install it with: sudo dnf install selinux-policy-devel"; \
+        exit 1; \
+    fi
+    make -f /usr/share/selinux/devel/Makefile cosy_default_systemd_t.pp
+    @echo "✓ Built cosy_default_systemd_t.pp"
+
+# Build cosy_strict_systemd_t policy module
+build-strict-systemd:
+    @echo "Building cosy_strict_systemd_t policy module..."
+    @if [ ! -f /usr/share/selinux/devel/Makefile ]; then \
+        echo "Error: selinux-policy-devel package not installed"; \
+        echo "Please install it with: sudo dnf install selinux-policy-devel"; \
+        exit 1; \
+    fi
+    make -f /usr/share/selinux/devel/Makefile cosy_strict_systemd_t.pp
+    @echo "✓ Built cosy_strict_systemd_t.pp"
+
+# Build all policy modules
+build: build-default build-strict build-default-systemd build-strict-systemd
+    @echo "✓ All policy modules built successfully"
+
+# Install cosy_default_t policy module (requires sudo/root)
+install-default: build-default
+    @echo "Installing cosy_default_t policy module..."
+    sudo semodule -i cosy_default_t.pp
+    @echo "✓ cosy_default_t installed"
+    @echo "You can now use: COSY_SELINUX=cosy_default_t cosy run ..."
+
+# Install cosy_strict_t policy module (requires sudo/root)
+install-strict: build-strict
+    @echo "Installing cosy_strict_t policy module..."
+    sudo semodule -i cosy_strict_t.pp
+    @echo "✓ cosy_strict_t installed"
+    @echo "You can now use: COSY_SELINUX=cosy_strict_t cosy run ..."
+
+# Install cosy_default_systemd_t policy module (requires sudo/root)
+install-default-systemd: build-default-systemd
+    @echo "Installing cosy_default_systemd_t policy module..."
+    sudo semodule -i cosy_default_systemd_t.pp
+    @echo "✓ cosy_default_systemd_t installed"
+    @echo "You can now use: COSY_SELINUX=cosy_default_systemd_t cosy run ..."
+
+# Install cosy_strict_systemd_t policy module (requires sudo/root)
+install-strict-systemd: build-strict-systemd
+    @echo "Installing cosy_strict_systemd_t policy module..."
+    sudo semodule -i cosy_strict_systemd_t.pp
+    @echo "✓ cosy_strict_systemd_t installed"
+    @echo "You can now use: COSY_SELINUX=cosy_strict_systemd_t cosy run ..."
+
+# Install all policy modules (requires sudo/root)
+install: install-default install-strict install-default-systemd install-strict-systemd
+    @echo "✓ All policy modules installed successfully"
+
+# Uninstall cosy_default_t policy module (requires sudo/root)
+uninstall-default:
+    @echo "Uninstalling cosy_default_t policy module..."
+    -sudo semodule -r cosy_default_t 2>/dev/null || echo "Module not installed"
+    @echo "✓ cosy_default_t uninstalled"
+
+# Uninstall cosy_strict_t policy module (requires sudo/root)
+uninstall-strict:
+    @echo "Uninstalling cosy_strict_t policy module..."
+    -sudo semodule -r cosy_strict_t 2>/dev/null || echo "Module not installed"
+    @echo "✓ cosy_strict_t uninstalled"
+
+# Uninstall cosy_default_systemd_t policy module (requires sudo/root)
+uninstall-default-systemd:
+    @echo "Uninstalling cosy_default_systemd_t policy module..."
+    -sudo semodule -r cosy_default_systemd_t 2>/dev/null || echo "Module not installed"
+    @echo "✓ cosy_default_systemd_t uninstalled"
+
+# Uninstall cosy_strict_systemd_t policy module (requires sudo/root)
+uninstall-strict-systemd:
+    @echo "Uninstalling cosy_strict_systemd_t policy module..."
+    -sudo semodule -r cosy_strict_systemd_t 2>/dev/null || echo "Module not installed"
+    @echo "✓ cosy_strict_systemd_t uninstalled"
+
+# Uninstall all policy modules (requires sudo/root)
+uninstall: uninstall-default uninstall-strict uninstall-default-systemd uninstall-strict-systemd
+    @echo "✓ All policy modules uninstalled"
+
+# Check which cosy policy modules are installed
+check:
+    @echo "Checking installed cosy policy modules..."
+    @echo ""
+    @if semodule -l | grep -q cosy_default_t; then \
+        echo "✓ cosy_default_t is installed"; \
+    else \
+        echo "✗ cosy_default_t is not installed"; \
+    fi
+    @if semodule -l | grep -q cosy_strict_t; then \
+        echo "✓ cosy_strict_t is installed"; \
+    else \
+        echo "✗ cosy_strict_t is not installed"; \
+    fi
+    @if semodule -l | grep -q cosy_default_systemd_t; then \
+        echo "✓ cosy_default_systemd_t is installed"; \
+    else \
+        echo "✗ cosy_default_systemd_t is not installed"; \
+    fi
+    @if semodule -l | grep -q cosy_strict_systemd_t; then \
+        echo "✓ cosy_strict_systemd_t is installed"; \
+    else \
+        echo "✗ cosy_strict_systemd_t is not installed"; \
+    fi
+    @echo ""
+    @echo "SELinux status:"
+    @getenforce 2>/dev/null || echo "SELinux not available on this system"
+
+# Clean build artifacts
+clean:
+    @echo "Cleaning build artifacts..."
+    rm -f *.mod *.pp
+    rm -rf tmp/
+    @echo "✓ Build artifacts removed"
+
+# Rebuild everything from scratch
+rebuild: clean build
+    @echo "✓ Rebuild complete"
+
+# Reinstall all modules (uninstall, rebuild, install)
+reinstall: uninstall rebuild install
+    @echo "✓ Reinstall complete"

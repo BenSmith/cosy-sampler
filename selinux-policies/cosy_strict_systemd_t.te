@@ -1,0 +1,250 @@
+policy_module(cosy_strict_systemd_t, 1.0.0)
+
+# Cosy Strict Systemd SELinux Policy
+# Stricter security policy for applications with limited needs
+# Read-only display access, limited device access, no dangerous capabilities
+
+require {
+    role unconfined_r;
+    role system_r;
+    type container_runtime_t;
+    type container_file_t;
+    type container_ro_file_t;
+    type xdm_tmp_t;
+    type user_tmp_t;
+    type device_t;
+    type xserver_t;
+    type fusefs_t;
+    type usr_t;
+    type bin_t;
+    type shell_exec_t;
+    type tmpfs_t;
+    type data_home_t;
+    type cgroup_t;
+    type sysctl_irq_t;
+    type sysctl_t;
+    type sysctl_kernel_t;
+    type proc_psi_t;
+    type sysctl_rpc_t;
+    type fs_t;
+    type random_device_t;
+    type urandom_device_t;
+    type proc_security_t;
+    type sysctl_nmi_watchdog_t;
+    type sysctl_kernel_ns_last_pid_t;
+    type sysctl_dev_t;
+    type sysctl_fs_t;
+    type sysctl_net_t;
+    type sysctl_net_unix_t;
+    type sysctl_vm_t;
+    type proc_kmsg_t;
+    type mtrr_device_t;
+    type proc_mdstat_t;
+    type pidfs_t;
+    type nsfs_t;
+    type xauth_home_t;
+    type system_dbusd_var_run_t;
+    type system_dbusd_t;
+    type init_t;
+    attribute container_init_domain;
+    class dbus { send_msg acquire_svc };
+    class system { status };
+}
+
+# Define our container type
+type cosy_strict_systemd_t, container_init_domain;
+domain_type(cosy_strict_systemd_t)
+
+# Associate with necessary roles
+role unconfined_r types cosy_strict_systemd_t;
+role system_r types cosy_strict_systemd_t;
+
+# Allow container runtime to transition to our type
+allow container_runtime_t cosy_strict_systemd_t:process transition;
+allow container_runtime_t cosy_strict_systemd_t:process2 nnp_transition;
+
+# Allow writing back to container runtime pipes (for I/O communication)
+allow cosy_strict_systemd_t container_runtime_t:fifo_file { read write ioctl getattr };
+
+# Allow entrypoint for container executables
+allow cosy_strict_systemd_t fusefs_t:file { entrypoint execute read write getattr open execute_no_trans map lock append setattr create unlink rename ioctl link };
+allow cosy_strict_systemd_t fusefs_t:dir { search read getattr open write add_name remove_name create rmdir setattr rename reparent watch ioctl mounton };
+allow cosy_strict_systemd_t fusefs_t:lnk_file { read getattr create unlink setattr rename watch };
+allow cosy_strict_systemd_t container_file_t:file { entrypoint execute read getattr open execute_no_trans map };
+allow cosy_strict_systemd_t usr_t:file { entrypoint execute read getattr open execute_no_trans map };
+allow cosy_strict_systemd_t bin_t:file { entrypoint execute read getattr open execute_no_trans map };
+allow cosy_strict_systemd_t shell_exec_t:file { entrypoint execute read getattr open execute_no_trans map };
+
+# Allow terminal/PTY access
+allow cosy_strict_systemd_t container_file_t:chr_file { rw_chr_file_perms create };
+term_use_ptmx(cosy_strict_systemd_t)
+
+########################################
+# Base Container Permissions (Limited)
+########################################
+
+# Process operations (no execmem, no dangerous caps)
+allow cosy_strict_systemd_t self:process { fork sigchld getsched getpgid setpgid getcap getsession getattr setfscreate setrlimit setcap };
+allow cosy_strict_systemd_t self:cap_userns { chown dac_override dac_read_search setfcap fsetid fowner setpcap sys_admin sys_ptrace };
+allow cosy_strict_systemd_t self:user_namespace create;
+allow cosy_strict_systemd_t self:fd use;
+allow cosy_strict_systemd_t self:fifo_file rw_fifo_file_perms;
+allow cosy_strict_systemd_t self:sock_file read_sock_file_perms;
+allow cosy_strict_systemd_t self:unix_dgram_socket create_socket_perms;
+allow cosy_strict_systemd_t self:unix_dgram_socket sendto;
+allow cosy_strict_systemd_t self:unix_stream_socket create_stream_socket_perms;
+allow cosy_strict_systemd_t self:unix_stream_socket connectto;
+allow cosy_strict_systemd_t self:shm create_shm_perms;
+allow cosy_strict_systemd_t self:sem create_sem_perms;
+allow cosy_strict_systemd_t self:msgq create_msgq_perms;
+allow cosy_strict_systemd_t self:msg { send receive };
+allow cosy_strict_systemd_t self:system ipc_info;
+
+# Networking (client only)
+allow cosy_strict_systemd_t self:tcp_socket create_stream_socket_perms;
+allow cosy_strict_systemd_t self:udp_socket create_socket_perms;
+allow cosy_strict_systemd_t self:netlink_route_socket create_netlink_socket_perms;
+allow cosy_strict_systemd_t self:netlink_netfilter_socket create_socket_perms;
+allow cosy_strict_systemd_t self:netlink_kobject_uevent_socket create_socket_perms;
+allow cosy_strict_systemd_t self:netlink_audit_socket create_socket_perms;
+
+# Basic system access (read-only)
+kernel_read_system_state(cosy_strict_systemd_t)
+kernel_read_network_state(cosy_strict_systemd_t)
+kernel_get_sysvipc_info(cosy_strict_systemd_t)
+kernel_io_uring_use(cosy_strict_systemd_t)
+corecmd_exec_bin(cosy_strict_systemd_t)
+corecmd_exec_shell(cosy_strict_systemd_t)
+files_read_etc_files(cosy_strict_systemd_t)
+files_read_usr_files(cosy_strict_systemd_t)
+miscfiles_read_localization(cosy_strict_systemd_t)
+libs_use_ld_so(cosy_strict_systemd_t)
+libs_use_shared_libs(cosy_strict_systemd_t)
+
+# /proc and /sys access
+allow cosy_strict_systemd_t sysctl_irq_t:dir { getattr read search open };
+allow cosy_strict_systemd_t sysctl_t:dir { getattr read search };
+allow cosy_strict_systemd_t sysctl_t:file { getattr };
+allow cosy_strict_systemd_t sysctl_kernel_t:file { getattr mounton };
+allow cosy_strict_systemd_t proc_psi_t:dir { getattr read search open };
+allow cosy_strict_systemd_t proc_psi_t:file { read open getattr };
+allow cosy_strict_systemd_t sysctl_rpc_t:dir { getattr read search open };
+allow cosy_strict_systemd_t proc_security_t:file { getattr };
+allow cosy_strict_systemd_t sysctl_nmi_watchdog_t:file { getattr };
+allow cosy_strict_systemd_t sysctl_kernel_ns_last_pid_t:file { getattr };
+allow cosy_strict_systemd_t sysctl_dev_t:dir { getattr read open };
+allow cosy_strict_systemd_t sysctl_fs_t:dir { getattr search read open };
+allow cosy_strict_systemd_t sysctl_fs_t:file { read open getattr ioctl };
+allow cosy_strict_systemd_t sysctl_net_t:dir { getattr search read open };
+allow cosy_strict_systemd_t sysctl_net_unix_t:dir { getattr search read open };
+allow cosy_strict_systemd_t sysctl_net_unix_t:file { read open getattr ioctl };
+allow cosy_strict_systemd_t sysctl_vm_t:dir { getattr read search };
+allow cosy_strict_systemd_t proc_kmsg_t:file { getattr mounton };
+allow cosy_strict_systemd_t mtrr_device_t:file { getattr };
+allow cosy_strict_systemd_t proc_mdstat_t:file { getattr };
+
+# pidfs access (for PID file descriptors in newer kernels)
+allow cosy_strict_systemd_t pidfs_t:filesystem getattr;
+
+# cgroup access (for resource monitoring)
+allow cosy_strict_systemd_t cgroup_t:dir { getattr read search open };
+allow cosy_strict_systemd_t cgroup_t:file { read open getattr mounton };
+allow cosy_strict_systemd_t cgroup_t:filesystem { getattr remount };
+
+# Network access (client connections only)
+corenet_tcp_sendrecv_generic_if(cosy_strict_systemd_t)
+corenet_tcp_sendrecv_generic_node(cosy_strict_systemd_t)
+corenet_tcp_connect_all_ports(cosy_strict_systemd_t)
+corenet_sendrecv_all_client_packets(cosy_strict_systemd_t)
+corenet_all_recvfrom_unlabeled(cosy_strict_systemd_t)
+corenet_all_recvfrom_netlabel(cosy_strict_systemd_t)
+
+# Container file access (full access within container)
+allow cosy_strict_systemd_t container_file_t:dir manage_dir_perms;
+allow cosy_strict_systemd_t container_file_t:dir mounton;
+allow cosy_strict_systemd_t container_file_t:file manage_file_perms;
+allow cosy_strict_systemd_t container_file_t:lnk_file manage_lnk_file_perms;
+allow cosy_strict_systemd_t container_file_t:sock_file manage_sock_file_perms;
+allow cosy_strict_systemd_t container_file_t:fifo_file manage_fifo_file_perms;
+
+# Container read-only file access (for system libraries, binaries, etc.)
+allow cosy_strict_systemd_t container_ro_file_t:dir { search read getattr open };
+allow cosy_strict_systemd_t container_ro_file_t:file { read getattr open execute execute_no_trans map };
+allow cosy_strict_systemd_t container_ro_file_t:lnk_file { read getattr };
+
+# Host home directory access (for bind mounts)
+allow cosy_strict_systemd_t data_home_t:dir { getattr search read };
+
+# Filesystem getattr (for df, stat, etc.)
+allow cosy_strict_systemd_t tmpfs_t:filesystem { getattr mount remount };
+allow cosy_strict_systemd_t tmpfs_t:file { read write open map getattr ioctl create unlink setattr mounton };
+allow cosy_strict_systemd_t tmpfs_t:dir { create read getattr open search add_name remove_name write setattr rmdir mounton };
+allow cosy_strict_systemd_t tmpfs_t:lnk_file { create read getattr unlink setattr };
+allow cosy_strict_systemd_t fusefs_t:filesystem { getattr remount unmount };
+allow cosy_strict_systemd_t container_file_t:filesystem { getattr remount unmount };
+allow cosy_strict_systemd_t fs_t:filesystem getattr;
+allow cosy_strict_systemd_t device_t:filesystem getattr;
+
+# Namespace filesystem access (for user namespace files)
+allow cosy_strict_systemd_t nsfs_t:file { read open getattr };
+
+########################################
+# X11 and Wayland Display Access (Read-Only)
+########################################
+
+# X11 socket access (read-only)
+allow cosy_strict_systemd_t xdm_tmp_t:sock_file read_sock_file_perms;
+allow cosy_strict_systemd_t xdm_tmp_t:dir { search getattr };
+allow cosy_strict_systemd_t xdm_tmp_t:unix_stream_socket connectto;
+
+# Wayland socket access (read-only)
+allow cosy_strict_systemd_t user_tmp_t:sock_file read_sock_file_perms;
+allow cosy_strict_systemd_t user_tmp_t:dir { search getattr };
+allow cosy_strict_systemd_t user_tmp_t:unix_stream_socket connectto;
+
+# X server connection
+allow cosy_strict_systemd_t xserver_t:unix_stream_socket connectto;
+
+# X authority file access (.Xauthority)
+allow cosy_strict_systemd_t xauth_home_t:file { read getattr open };
+
+########################################
+# GPU and Device Access (Limited)
+########################################
+
+# DRI device access (read and ioctl only, no write)
+allow cosy_strict_systemd_t device_t:chr_file { read open ioctl getattr };
+allow cosy_strict_systemd_t device_t:dir { search getattr };
+
+# Random device access
+allow cosy_strict_systemd_t random_device_t:chr_file { getattr };
+allow cosy_strict_systemd_t urandom_device_t:chr_file { write };
+
+# Sysfs read-only
+dev_read_sysfs(cosy_strict_systemd_t)
+
+########################################
+# Audio Access
+########################################
+
+# Allow PulseAudio/PipeWire connections (read-only sockets)
+userdom_read_user_tmp_files(cosy_strict_systemd_t)
+# Note: Audio playback requires write access to the socket, so we allow it
+allow cosy_strict_systemd_t user_tmp_t:sock_file write;
+
+########################################
+# D-Bus Access
+########################################
+
+# Allow D-Bus socket access (for systemd-logind, etc.)
+allow cosy_strict_systemd_t system_dbusd_var_run_t:sock_file write;
+allow cosy_strict_systemd_t system_dbusd_t:unix_stream_socket connectto;
+
+# Allow D-Bus message sending
+allow cosy_strict_systemd_t system_dbusd_t:dbus send_msg;
+allow cosy_strict_systemd_t system_dbusd_t:dbus acquire_svc;
+allow cosy_strict_systemd_t init_t:dbus send_msg;
+allow cosy_strict_systemd_t init_t:system status;
+
+# Make this a D-Bus system bus client
+dbus_system_bus_client(cosy_strict_systemd_t)

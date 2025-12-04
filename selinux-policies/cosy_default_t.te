@@ -1,0 +1,215 @@
+policy_module(cosy_default_t, 1.0.0)
+
+# Cosy Default SELinux Policy
+# Balanced security policy for GUI applications with audio and GPU access
+# More permissive than strict, but with some container isolation
+
+require {
+    role unconfined_r;
+    role system_r;
+    type container_runtime_t;
+    type container_file_t;
+    type container_ro_file_t;
+    type xdm_tmp_t;
+    type user_tmp_t;
+    type device_t;
+    type xserver_t;
+    type fusefs_t;
+    type usr_t;
+    type bin_t;
+    type shell_exec_t;
+    type tmpfs_t;
+    type data_home_t;
+    type cgroup_t;
+    type sysctl_irq_t;
+    type sysctl_t;
+    type proc_psi_t;
+    type sysctl_rpc_t;
+    type fs_t;
+    type random_device_t;
+    type urandom_device_t;
+    type proc_security_t;
+    type sysctl_nmi_watchdog_t;
+    type sysctl_kernel_ns_last_pid_t;
+    type sysctl_dev_t;
+    type sysctl_fs_t;
+    type sysctl_net_t;
+    type sysctl_vm_t;
+    type proc_kmsg_t;
+    type mtrr_device_t;
+    type proc_mdstat_t;
+    type unconfined_t;
+    type node_t;
+}
+
+# Define our container type
+type cosy_default_t;
+domain_type(cosy_default_t)
+
+# Associate with necessary roles
+role unconfined_r types cosy_default_t;
+role system_r types cosy_default_t;
+
+# Allow container runtime to transition to our type
+allow container_runtime_t cosy_default_t:process transition;
+allow container_runtime_t cosy_default_t:process2 nnp_transition;
+
+# Allow writing back to container runtime pipes (for I/O communication)
+allow cosy_default_t container_runtime_t:fifo_file { read write ioctl };
+
+# Allow entrypoint for container executables
+# Containers can have files from various filesystems (fuse, overlayfs, etc.)
+allow cosy_default_t fusefs_t:file { entrypoint execute read write getattr open execute_no_trans map lock append setattr create unlink rename ioctl link };
+allow cosy_default_t fusefs_t:dir { search read getattr open write add_name remove_name create rmdir setattr rename reparent watch };
+allow cosy_default_t fusefs_t:lnk_file { read getattr create unlink setattr rename };
+allow cosy_default_t container_file_t:file { entrypoint execute read getattr open execute_no_trans map };
+allow cosy_default_t usr_t:file { entrypoint execute read getattr open execute_no_trans map };
+allow cosy_default_t bin_t:file { entrypoint execute read getattr open execute_no_trans map };
+allow cosy_default_t shell_exec_t:file { entrypoint execute read getattr open execute_no_trans map };
+
+# Allow terminal/PTY access
+allow cosy_default_t container_file_t:chr_file rw_chr_file_perms;
+term_use_ptmx(cosy_default_t)
+
+########################################
+# Base Container Permissions
+########################################
+
+# Process operations
+allow cosy_default_t self:process { fork sigchld getsched setsched getpgid setpgid getcap setcap getsession getattr execmem execheap execstack setfscreate setrlimit ptrace };
+allow cosy_default_t self:cap_userns { chown dac_override setfcap fsetid fowner sys_admin sys_chroot sys_ptrace };
+allow cosy_default_t self:user_namespace create;
+allow cosy_default_t self:fd use;
+allow cosy_default_t self:fifo_file rw_fifo_file_perms;
+allow cosy_default_t self:sock_file read_sock_file_perms;
+allow cosy_default_t self:unix_dgram_socket create_socket_perms;
+allow cosy_default_t self:unix_stream_socket create_stream_socket_perms;
+allow cosy_default_t self:unix_stream_socket connectto;
+allow cosy_default_t self:shm create_shm_perms;
+allow cosy_default_t self:sem create_sem_perms;
+allow cosy_default_t self:msgq create_msgq_perms;
+allow cosy_default_t self:msg { send receive };
+
+# Networking
+allow cosy_default_t self:tcp_socket create_stream_socket_perms;
+allow cosy_default_t self:udp_socket create_socket_perms;
+allow cosy_default_t self:netlink_route_socket create_netlink_socket_perms;
+
+# UDP network binding (for WebRTC, QUIC, etc.)
+allow cosy_default_t node_t:udp_socket node_bind;
+
+# Basic system access
+kernel_read_system_state(cosy_default_t)
+kernel_read_network_state(cosy_default_t)
+corecmd_exec_bin(cosy_default_t)
+corecmd_exec_shell(cosy_default_t)
+files_read_etc_files(cosy_default_t)
+files_read_usr_files(cosy_default_t)
+miscfiles_read_localization(cosy_default_t)
+libs_use_ld_so(cosy_default_t)
+libs_use_shared_libs(cosy_default_t)
+
+# /proc and /sys access
+allow cosy_default_t sysctl_irq_t:dir { getattr read search open };
+allow cosy_default_t sysctl_t:dir { getattr read search };
+allow cosy_default_t sysctl_t:file { getattr };
+allow cosy_default_t proc_psi_t:dir { getattr read search open };
+allow cosy_default_t sysctl_rpc_t:dir { getattr read search open };
+allow cosy_default_t proc_security_t:file { getattr };
+allow cosy_default_t sysctl_nmi_watchdog_t:file { getattr };
+allow cosy_default_t sysctl_kernel_ns_last_pid_t:file { getattr };
+allow cosy_default_t sysctl_dev_t:dir { getattr };
+allow cosy_default_t sysctl_fs_t:dir { getattr };
+allow cosy_default_t sysctl_net_t:dir { getattr };
+allow cosy_default_t sysctl_vm_t:dir { getattr read search };
+allow cosy_default_t proc_kmsg_t:file { getattr };
+allow cosy_default_t mtrr_device_t:file { getattr };
+allow cosy_default_t proc_mdstat_t:file { getattr };
+
+# cgroup access (for resource monitoring)
+allow cosy_default_t cgroup_t:dir { getattr read search open };
+allow cosy_default_t cgroup_t:file { read open getattr };
+allow cosy_default_t cgroup_t:filesystem getattr;
+
+# Network access
+corenet_tcp_sendrecv_generic_if(cosy_default_t)
+corenet_tcp_sendrecv_generic_node(cosy_default_t)
+corenet_tcp_bind_generic_node(cosy_default_t)
+corenet_tcp_connect_all_ports(cosy_default_t)
+corenet_sendrecv_all_client_packets(cosy_default_t)
+corenet_all_recvfrom_unlabeled(cosy_default_t)
+corenet_all_recvfrom_netlabel(cosy_default_t)
+
+# Allow binding to all ports (server functionality)
+corenet_tcp_bind_all_ports(cosy_default_t)
+corenet_udp_bind_all_ports(cosy_default_t)
+
+# Container file access
+allow cosy_default_t container_file_t:dir manage_dir_perms;
+allow cosy_default_t container_file_t:file manage_file_perms;
+allow cosy_default_t container_file_t:lnk_file manage_lnk_file_perms;
+allow cosy_default_t container_file_t:sock_file manage_sock_file_perms;
+allow cosy_default_t container_file_t:fifo_file manage_fifo_file_perms;
+
+# Container read-only file access (for system libraries, binaries, etc.)
+allow cosy_default_t container_ro_file_t:dir { search read getattr open };
+allow cosy_default_t container_ro_file_t:file { read getattr open execute execute_no_trans map };
+allow cosy_default_t container_ro_file_t:lnk_file { read getattr };
+
+# Host home directory access (for bind mounts)
+allow cosy_default_t data_home_t:dir { getattr search read };
+
+# Filesystem getattr (for df, stat, etc.)
+allow cosy_default_t tmpfs_t:filesystem getattr;
+
+# tmpfs file access (for shared memory, GPU sync, audio, etc.)
+allow cosy_default_t tmpfs_t:file { read write open map getattr };
+allow cosy_default_t fusefs_t:filesystem getattr;
+allow cosy_default_t container_file_t:filesystem getattr;
+allow cosy_default_t fs_t:filesystem getattr;
+allow cosy_default_t device_t:filesystem getattr;
+
+########################################
+# X11 and Wayland Display Access
+########################################
+
+# X11 socket access
+allow cosy_default_t xdm_tmp_t:sock_file rw_sock_file_perms;
+allow cosy_default_t xdm_tmp_t:dir { search getattr read };
+allow cosy_default_t xdm_tmp_t:unix_stream_socket connectto;
+
+# Wayland socket access
+allow cosy_default_t user_tmp_t:sock_file rw_sock_file_perms;
+allow cosy_default_t user_tmp_t:dir { search getattr read };
+allow cosy_default_t user_tmp_t:unix_stream_socket connectto;
+allow cosy_default_t user_tmp_t:file { read write open map };
+
+# X server connection for DRI
+allow cosy_default_t xserver_t:unix_stream_socket connectto;
+
+# Allow connecting to unconfined X server (host X server)
+allow cosy_default_t unconfined_t:unix_stream_socket connectto;
+
+########################################
+# GPU and Device Access
+########################################
+
+# DRI/GPU device access
+allow cosy_default_t device_t:chr_file { read write open ioctl getattr };
+allow cosy_default_t device_t:dir { search read getattr };
+
+# Random device access
+allow cosy_default_t random_device_t:chr_file { getattr };
+allow cosy_default_t urandom_device_t:chr_file { write };
+
+# Additional device access for GPU
+dev_read_sysfs(cosy_default_t)
+dev_rw_dri(cosy_default_t)
+
+########################################
+# Audio Access
+########################################
+
+# Allow PulseAudio/PipeWire connections
+userdom_write_user_tmp_sockets(cosy_default_t)
+userdom_read_user_tmp_files(cosy_default_t)
