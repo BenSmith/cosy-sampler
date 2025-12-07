@@ -12,6 +12,7 @@ require {
     type container_ro_file_t;
     type xdm_tmp_t;
     type user_tmp_t;
+    type user_home_t;
     type device_t;
     type xserver_t;
     type fusefs_t;
@@ -51,6 +52,7 @@ require {
     attribute container_init_domain;
     class dbus { send_msg acquire_svc };
     class system { status };
+    class cap_userns net_admin;
 }
 
 # Define our container type
@@ -87,7 +89,7 @@ term_use_ptmx(cosy_default_systemd_t)
 
 # Process operations
 allow cosy_default_systemd_t self:process { fork sigchld getsched setsched getpgid setpgid getcap setcap getsession getattr execmem execheap execstack setfscreate setrlimit ptrace };
-allow cosy_default_systemd_t self:cap_userns { chown dac_override dac_read_search setfcap fsetid fowner sys_admin sys_chroot sys_ptrace setpcap };
+allow cosy_default_systemd_t self:cap_userns { chown dac_override dac_read_search setfcap fsetid fowner sys_admin sys_chroot sys_ptrace setpcap net_admin };
 allow cosy_default_systemd_t self:user_namespace create;
 allow cosy_default_systemd_t self:fd use;
 allow cosy_default_systemd_t self:fifo_file rw_fifo_file_perms;
@@ -116,6 +118,7 @@ allow cosy_default_systemd_t node_t:udp_socket node_bind;
 # Basic system access
 kernel_read_system_state(cosy_default_systemd_t)
 kernel_read_network_state(cosy_default_systemd_t)
+kernel_read_sysctl(cosy_default_systemd_t)
 kernel_get_sysvipc_info(cosy_default_systemd_t)
 kernel_io_uring_use(cosy_default_systemd_t)
 corecmd_exec_bin(cosy_default_systemd_t)
@@ -185,6 +188,10 @@ allow cosy_default_systemd_t container_ro_file_t:lnk_file { read getattr };
 # Host home directory access (for bind mounts)
 allow cosy_default_systemd_t data_home_t:dir { getattr search read };
 
+# User home directory access
+allow cosy_default_systemd_t user_home_t:dir { getattr open read search watch };
+allow cosy_default_systemd_t user_home_t:file { getattr open read map };
+
 # Filesystem getattr (for df, stat, etc.)
 allow cosy_default_systemd_t tmpfs_t:filesystem { getattr mount remount };
 
@@ -192,6 +199,7 @@ allow cosy_default_systemd_t tmpfs_t:filesystem { getattr mount remount };
 allow cosy_default_systemd_t tmpfs_t:file { read write open map getattr ioctl create unlink setattr mounton };
 allow cosy_default_systemd_t tmpfs_t:dir { create read getattr open search add_name remove_name write setattr rmdir mounton };
 allow cosy_default_systemd_t tmpfs_t:lnk_file { create read getattr unlink setattr };
+fs_exec_tmpfs_files(cosy_default_systemd_t)
 allow cosy_default_systemd_t fusefs_t:filesystem { getattr remount unmount };
 allow cosy_default_systemd_t container_file_t:filesystem { getattr remount unmount };
 allow cosy_default_systemd_t fs_t:filesystem getattr;
